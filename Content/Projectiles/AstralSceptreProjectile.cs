@@ -16,7 +16,7 @@ namespace Primordium.Content.Projectiles
 		private const int OrbitTicks = 50;
 		private const float OrbitRadius = 96f;
 		private const float SpinSpeed = 0.13f;
-		private const float StrikeSpeed = 16f;
+		private const float StrikeSpeed = 12f;
 		private const float RetargetRange = 700f;
 
 		private Vector2 originalVelocity;
