@@ -427,3 +427,7 @@ FodyWeavers.xsd
 
 # tModLoader build output
 *.tmod
+*.mdc
+
+#Project Specific
+References/
