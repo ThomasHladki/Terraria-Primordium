@@ -10,6 +10,18 @@ Items: {
 			Consecutive hits on the same enemy gain 5% damage, up to five times
 			'''
 	}
+
+	Voidcaller: {
+		DisplayName: Voidcaller
+		Tooltip:
+			'''
+			Fires a slow orb that pulls nearby enemies inward
+			The orb explodes at the end of its flight
+			'''
+	}
 }
 
-Projectiles.AstralSceptreProjectile.DisplayName: Astral Sceptre Projectile
+Projectiles: {
+	AstralSceptreProjectile.DisplayName: Astral Sceptre Projectile
+	VoidcallerProjectile.DisplayName: Voidcaller Orb
+}
