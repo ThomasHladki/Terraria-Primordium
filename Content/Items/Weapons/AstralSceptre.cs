@@ -9,7 +9,7 @@ namespace Primordium.Content.Items.Weapons
 {
 	public class AstralSceptre : ModItem
 	{
-		private const float TargetRange = 700f;
+		private const float TargetRange = 600f;
 
 		public override void SetStaticDefaults() {
 			Item.staff[Type] = true;
