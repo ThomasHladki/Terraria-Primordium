@@ -22,7 +22,15 @@ Items: {
 	}
 }
 
+NPCs: {
+	CyberZombie: {
+		DisplayName: Cyber-Zombie
+		Bestiary: A corpse rebuilt with crude metal. Its eye fires a weak laser.
+	}
+}
+
 Projectiles: {
 	AstralSceptreProjectile.DisplayName: Astral Sceptre Projectile
 	VoidcallerProjectile.DisplayName: Voidcaller Orb
+	CyberZombieLaser.DisplayName: Cyber Laser
 }
