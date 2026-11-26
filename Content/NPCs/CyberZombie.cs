@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Primordium.Content.Projectiles;
+using ReLogic.Utilities;
 using Terraria;
+using Terraria.Audio;
 using Terraria.GameContent.Bestiary;
 using Terraria.GameContent.ItemDropRules;
 using Terraria.ID;
@@ -12,16 +14,23 @@ namespace Primordium.Content.NPCs
 {
 	public class CyberZombie : ModNPC
 	{
-		private const int LaserInterval = 600;
+		private const int LaserInterval = 300;
 		private const float LaserRange = 20f * 16f;
 		private const float LaserSpeed = 6f;
 		private const int ClassicContactDamage = 14;
 		private const int ClassicLaserDamage = 8;
 
-		private int laserTimer;
+		public static readonly SoundStyle Groan = new SoundStyle("Primordium/Sounds/CyberZombieGroan") {
+			Volume = 0.8f,
+			PitchVariance = 0.06f,
+			MaxInstances = 2,
+			SoundLimitBehavior = SoundLimitBehavior.ReplaceOldest
+		};
+
+		private int _laserTimer;
 
 		public override void SetStaticDefaults() {
-			Main.npcFrameCount[Type] = 1;
+			Main.npcFrameCount[Type] = Main.npcFrameCount[NPCID.Zombie];
 
 			NPCID.Sets.NPCBestiaryDrawModifiers draw = new NPCID.Sets.NPCBestiaryDrawModifiers() {
 				Velocity = 1f
@@ -41,15 +50,12 @@ namespace Primordium.Content.NPCs
 			NPC.knockBackResist = 0.5f;
 			NPC.aiStyle = NPCAIStyleID.Fighter;
 			AIType = NPCID.Zombie;
-			laserTimer = 0;
+			AnimationType = NPCID.Zombie;
+			_laserTimer = 0;
 		}
 
 		public override void ApplyDifficultyAndPlayerScaling(int numPlayers, float balance, float bossAdjustment) {
 			NPC.lifeMax = (int)(NPC.lifeMax * balance);
-		}
-
-		public override void FindFrame(int frameHeight) {
-			NPC.spriteDirection = NPC.direction;
 		}
 
 		public override void SetBestiary(BestiaryDatabase database, BestiaryEntry bestiaryEntry) {
@@ -78,12 +84,16 @@ namespace Primordium.Content.NPCs
 		}
 
 		public override void AI() {
+			if (!Main.dedServ && Main.rand.NextBool(420)) {
+				SoundEngine.PlaySound(Groan, NPC.Center);
+			}
+
 			if (Main.netMode == NetmodeID.MultiplayerClient) {
 				return;
 			}
 
-			if (laserTimer < LaserInterval) {
-				laserTimer++;
+			if (_laserTimer < LaserInterval) {
+				_laserTimer++;
 				return;
 			}
 
@@ -92,7 +102,7 @@ namespace Primordium.Content.NPCs
 			}
 
 			Player target = Main.player[NPC.target];
-			Vector2 eye = NPC.Center + new Vector2(NPC.direction * 4f, -10f);
+			Vector2 eye = NPC.Center + new Vector2(NPC.direction * 2f, -9f);
 			if (target.Distance(eye) > LaserRange || !Collision.CanHit(eye, 1, 1, target.position, target.width, target.height)) {
 				return;
 			}
@@ -111,7 +121,43 @@ namespace Primordium.Content.NPCs
 				damage,
 				1f,
 				Main.myPlayer);
-			laserTimer = 0;
+			_laserTimer = 0;
+		}
+	}
+
+	// Zombie AI is run with this NPC's type swapped to a zombie, and that path plays SoundID.ZombieMoan
+	// without looking at soundDelay. Cancel only the moan that comes from this NPC.
+	public class CyberZombieGroanSilence : ModSystem
+	{
+		public override void Load() {
+			On_SoundEngine.PlaySound_refSoundStyle_Nullable1_SoundUpdateCallback += SilenceBorrowedZombieMoan;
+		}
+
+		public override void Unload() {
+			On_SoundEngine.PlaySound_refSoundStyle_Nullable1_SoundUpdateCallback -= SilenceBorrowedZombieMoan;
+		}
+
+		private static SlotId SilenceBorrowedZombieMoan(On_SoundEngine.orig_PlaySound_refSoundStyle_Nullable1_SoundUpdateCallback orig, ref SoundStyle style, Vector2? position, SoundUpdateCallback updateCallback) {
+			if (position.HasValue && style.SoundPath.StartsWith("Terraria/Sounds/Zombie_") && GroanComesFromCyberZombie(position.Value)) {
+				return SlotId.Invalid;
+			}
+
+			return orig(ref style, position, updateCallback);
+		}
+
+		private static bool GroanComesFromCyberZombie(Vector2 soundPosition) {
+			for (int i = 0; i < Main.maxNPCs; i++) {
+				NPC npc = Main.npc[i];
+				if (!npc.active || npc.ModNPC is not CyberZombie) {
+					continue;
+				}
+
+				if (Vector2.DistanceSquared(npc.position, soundPosition) < 16f || Vector2.DistanceSquared(npc.Center, soundPosition) < 16f) {
+					return true;
+				}
+			}
+
+			return false;
 		}
 	}
 }

@@ -1,6 +1,9 @@
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Primordium.Content.NPCs;
 using Terraria;
 using Terraria.Audio;
+using Terraria.GameContent;
 using Terraria.ID;
 using Terraria.ModLoader;
 
@@ -9,8 +12,8 @@ namespace Primordium.Content.Projectiles
 	public class CyberZombieLaser : ModProjectile
 	{
 		public override void SetDefaults() {
-			Projectile.width = 14;
-			Projectile.height = 4;
+			Projectile.width = 22;
+			Projectile.height = 7;
 			Projectile.hostile = true;
 			Projectile.friendly = false;
 			Projectile.tileCollide = true;
@@ -20,19 +23,39 @@ namespace Primordium.Content.Projectiles
 		}
 
 		public override void AI() {
-			Projectile.rotation = Projectile.velocity.ToRotation();
-			if (Projectile.localAI[0] > 0f || Main.dedServ) {
+			Projectile.rotation = Projectile.velocity.ToRotation() + MathHelper.PiOver2;
+			if (Main.dedServ) {
+				return;
+			}
+
+			Lighting.AddLight(Projectile.Center, 0.95f, 0.08f, 0.05f);
+			if (Projectile.localAI[0] > 0f) {
 				return;
 			}
 
 			Projectile.localAI[0] = 1f;
-			SoundEngine.PlaySound(SoundID.Item12 with { Volume = 0.45f, Pitch = 0.15f }, Projectile.Center);
-			for (int i = 0; i < 4; i++) {
-				Dust spark = Dust.NewDustDirect(Projectile.position, Projectile.width, Projectile.height, DustID.Electric, newColor: new Color(80, 230, 255));
+			SoundEngine.PlaySound(CyberZombie.Groan with { Volume = 0.95f }, Projectile.Center);
+			Vector2 tip = Projectile.Center + Vector2.Normalize(Projectile.velocity) * 42f;
+			for (int i = 0; i < 3; i++) {
+				Dust spark = Dust.NewDustDirect(tip, 0, 0, DustID.RedTorch, newColor: new Color(255, 70, 50));
 				spark.noGravity = true;
-				spark.scale = 0.7f;
-				spark.velocity = Projectile.velocity * 0.15f + Main.rand.NextVector2Circular(0.6f, 0.6f);
+				spark.scale = 1.1f;
+				spark.velocity = Projectile.velocity * 0.05f;
 			}
+		}
+
+		public override bool PreDraw(ref Color lightColor) {
+			Texture2D texture = TextureAssets.Projectile[Type].Value;
+			Vector2 origin = texture.Size() / 2f;
+			Vector2 position = Projectile.Center - Main.screenPosition;
+
+			Main.spriteBatch.End();
+			Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
+			Main.spriteBatch.Draw(texture, position, null, new Color(255, 36, 24), Projectile.rotation, origin, 1f, SpriteEffects.None, 0f);
+			Main.spriteBatch.Draw(texture, position, null, new Color(255, 210, 196), Projectile.rotation, origin, new Vector2(0.35f, 1f), SpriteEffects.None, 0f);
+			Main.spriteBatch.End();
+			Main.spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, Main.DefaultSamplerState, DepthStencilState.None, Main.Rasterizer, null, Main.GameViewMatrix.TransformationMatrix);
+			return false;
 		}
 	}
 }
