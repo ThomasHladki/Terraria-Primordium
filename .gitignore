@@ -427,7 +427,17 @@ FodyWeavers.xsd
 
 # tModLoader build output
 *.tmod
-*.mdc
 
 #Project Specific
 References/
+
+# Local tools. They are not part of the mod build.
+Tools/
+
+# Local sprite generation. Weights and ComfyUI live outside the repo.
+artifacts/
+*.safetensors
+*.ckpt
+*.gguf
+*.mdc
+SPRITE_GENERATION.md

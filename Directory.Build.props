@@ -1,0 +1,6 @@
+<Project>
+	<!-- Applied before the SDK globs, so tool projects and reference art are not part of the mod compile. -->
+	<PropertyGroup>
+		<DefaultItemExcludes>$(DefaultItemExcludes);Tools/**;tools/**;References/**;artifacts/**</DefaultItemExcludes>
+	</PropertyGroup>
+</Project>

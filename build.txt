@@ -1,3 +1,4 @@
 displayName = Primordium
 author = Zetrax
 version = 0.1
+buildIgnore = References\*, Tools\*, artifacts\*

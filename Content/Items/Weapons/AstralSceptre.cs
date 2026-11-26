@@ -16,8 +16,8 @@ namespace Primordium.Content.Items.Weapons
 		}
 
 		public override void SetDefaults() {
-			Item.DefaultToStaff(ModContent.ProjectileType<AstralSceptreProjectile>(), 12f, 32, 12);
-			Item.damage = 85;
+			Item.DefaultToStaff(ModContent.ProjectileType<AstralSceptreProjectile>(), 12f, 46, 24);
+			Item.damage = 75;
 			Item.knockBack = 4f;
 			Item.rare = ItemRarityID.Lime;
 			Item.value = Item.sellPrice(gold: 5);

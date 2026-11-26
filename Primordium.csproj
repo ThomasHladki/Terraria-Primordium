@@ -8,9 +8,19 @@
 		
 	</PropertyGroup>
 
-	<!-- References -->
+	<!-- The sprite tools are separate projects. Their source and generated files must not be compiled into the mod. -->
 	<ItemGroup>
-		
+		<Compile Remove="Tools/**" />
+		<Compile Remove="tools/**" />
+		<Compile Remove="References/**" />
+		<Compile Remove="artifacts/**" />
+		<AdditionalFiles Remove="Tools/**" />
+		<AdditionalFiles Remove="tools/**" />
+		<AdditionalFiles Remove="References/**" />
+		<AdditionalFiles Remove="artifacts/**" />
+		<None Remove="Tools/**" />
+		<None Remove="References/**" />
+		<None Remove="artifacts/**" />
 	</ItemGroup>
 
 </Project>
