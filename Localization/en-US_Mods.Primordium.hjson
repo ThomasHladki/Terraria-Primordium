@@ -15,8 +15,9 @@ Items: {
 		DisplayName: Voidcaller
 		Tooltip:
 			'''
-			Fires a slow orb that pulls nearby enemies inward
-			The orb explodes at the end of its flight
+			Pulls nearby enemies inward and bursts at the end 
+			of its flight, or on striking a foe it cannot pull
+			Great for crowd control!
 			'''
 	}
 }

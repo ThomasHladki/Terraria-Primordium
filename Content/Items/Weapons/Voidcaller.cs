@@ -10,7 +10,7 @@ namespace Primordium.Content.Items.Weapons
 		public override void SetDefaults() {
 			Item.width = 28;
 			Item.height = 32;
-			Item.damage = 62;
+			Item.damage = 50;
 			Item.DamageType = DamageClass.Magic;
 			Item.knockBack = 6f;
 			Item.mana = 15;
@@ -32,7 +32,7 @@ namespace Primordium.Content.Items.Weapons
 				.AddIngredient(ItemID.SoulofNight, 15)
 				.AddIngredient(ItemID.SpellTome)
 				.AddIngredient(ItemID.DarkShard)
-				.AddTile(TileID.MythrilAnvil)
+				.AddTile(TileID.Bookcases)
 				.Register();
 		}
 	}

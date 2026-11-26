@@ -10,18 +10,30 @@ namespace Primordium.Content.Projectiles
 {
 	/// <summary>
 	/// Slow orb that draws nearby foes inward, then bursts once.
-	/// Bosses and knockback-immune enemies only drift. Worm segments are left alone so the head stays in charge.
+	/// VoidcallerGlobalNPC applies the pull after each enemy's own AI.
 	/// </summary>
 	public class VoidcallerProjectile : ModProjectile
 	{
+		public const float PullRadius = 160f;
+		public const float PullStrength = 1.55f;
+		public const float MaxApproach = 3.8f;
+		public const float CalmRadius = 26f;
+
+		public static bool ReceivesPull(NPC npc) {
+			if (npc.boss || npc.knockBackResist <= 0f) {
+				return false;
+			}
+
+			if (npc.realLife >= 0 && npc.realLife != npc.whoAmI) {
+				return false;
+			}
+
+			return true;
+		}
+
 		private const int TravelTime = 84;
 		private const int ExplodeTime = 8;
 		private const int BurstSize = 112;
-		private const float PullRadius = 140f;
-		private const float PullAccel = 0.36f;
-		private const float HeavyPullAccel = 0.02f;
-		private const float MaxPullSpeed = 6f;
-		private const float HeavyPullSpeed = 0.7f;
 
 		private bool Exploding => Projectile.ai[0] >= 1f;
 
@@ -65,7 +77,7 @@ namespace Primordium.Content.Projectiles
 		}
 
 		public override void AI() {
-			if (!Exploding && Projectile.timeLeft <= ExplodeTime) {
+			if (!Exploding && (Projectile.timeLeft <= ExplodeTime || HitsUnpulledHostile())) {
 				BeginExplosion();
 			}
 
@@ -90,7 +102,6 @@ namespace Primordium.Content.Projectiles
 
 			Lighting.AddLight(Projectile.Center, 0.4f, 0.05f, 0.65f);
 			Projectile.rotation += 0.12f;
-			PullNearby();
 			SpawnTravelDust();
 		}
 
@@ -132,49 +143,20 @@ namespace Primordium.Content.Projectiles
 			}
 		}
 
-		private void PullNearby() {
-			if (Main.netMode == NetmodeID.MultiplayerClient) {
-				return;
-			}
-
-			bool sync = Projectile.timeLeft % 12 == 0;
-
+		private bool HitsUnpulledHostile() {
+			Rectangle hitbox = Projectile.Hitbox;
 			for (int i = 0; i < Main.maxNPCs; i++) {
 				NPC npc = Main.npc[i];
-				if (!npc.active || !npc.CanBeChasedBy(Projectile)) {
+				if (!npc.active || !npc.CanBeChasedBy(Projectile) || ReceivesPull(npc)) {
 					continue;
 				}
 
-				if (npc.realLife >= 0 && npc.realLife != npc.whoAmI) {
-					continue;
-				}
-
-				if (!Collision.CanHitLine(Projectile.Center, 1, 1, npc.Center, 1, 1)) {
-					continue;
-				}
-
-				Vector2 toOrb = Projectile.Center - npc.Center;
-				float distance = toOrb.Length();
-				if (distance < 10f || distance > PullRadius) {
-					continue;
-				}
-
-				Vector2 direction = toOrb / distance;
-				bool heavy = npc.boss || npc.knockBackResist <= 0f;
-				float accel = heavy ? HeavyPullAccel : PullAccel * MathHelper.Clamp(npc.knockBackResist, 0.4f, 1f);
-				float cap = heavy ? HeavyPullSpeed : MaxPullSpeed;
-				float falloff = 0.55f + 0.45f * (1f - distance / PullRadius);
-				npc.velocity += direction * accel * falloff;
-
-				float toward = Vector2.Dot(npc.velocity, direction);
-				if (toward > cap) {
-					npc.velocity -= direction * (toward - cap);
-				}
-
-				if (sync) {
-					npc.netUpdate = true;
+				if (hitbox.Intersects(npc.Hitbox)) {
+					return true;
 				}
 			}
+
+			return false;
 		}
 
 		private void SpawnTravelDust() {
