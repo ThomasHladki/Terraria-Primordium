@@ -441,3 +441,5 @@ artifacts/
 *.gguf
 *.mdc
 SPRITE_GENERATION.md
+*.md
+/.cursor
