@@ -1,6 +1,5 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Primordium.Content.NPCs;
 using Terraria;
 using Terraria.Audio;
 using Terraria.GameContent;
@@ -13,7 +12,7 @@ namespace Primordium.Content.Projectiles
 	{
 		public override void SetDefaults() {
 			Projectile.width = 22;
-			Projectile.height = 7;
+			Projectile.height = 14;
 			Projectile.hostile = true;
 			Projectile.friendly = false;
 			Projectile.tileCollide = true;
@@ -34,8 +33,9 @@ namespace Primordium.Content.Projectiles
 			}
 
 			Projectile.localAI[0] = 1f;
-			SoundEngine.PlaySound(CyberZombie.Groan with { Volume = 0.95f }, Projectile.Center);
-			Vector2 tip = Projectile.Center + Vector2.Normalize(Projectile.velocity) * 42f;
+			// Eyezor's eye laser plays this zap when the beam is fired.
+			SoundEngine.PlaySound(SoundID.Item33, Projectile.Center);
+			Vector2 tip = Projectile.Center + Vector2.Normalize(Projectile.velocity) * 32f;
 			for (int i = 0; i < 3; i++) {
 				Dust spark = Dust.NewDustDirect(tip, 0, 0, DustID.RedTorch, newColor: new Color(255, 70, 50));
 				spark.noGravity = true;

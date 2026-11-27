@@ -14,11 +14,11 @@ namespace Primordium.Content.NPCs
 {
 	public class CyberZombie : ModNPC
 	{
-		private const int LaserInterval = 300;
+		private const int LaserInterval = 450;
 		private const float LaserRange = 20f * 16f;
 		private const float LaserSpeed = 6f;
-		private const int ClassicContactDamage = 14;
-		private const int ClassicLaserDamage = 8;
+		private const int ClassicContactDamage = 18;
+		private const int ClassicLaserDamage = 6;
 
 		public static readonly SoundStyle Groan = new SoundStyle("Primordium/Sounds/CyberZombieGroan") {
 			Volume = 0.8f,
