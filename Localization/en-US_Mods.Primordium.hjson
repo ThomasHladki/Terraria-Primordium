@@ -4,7 +4,11 @@
 Items: {
 	LuminousGel: {
 		DisplayName: Luminous Gel
-		Tooltip: A cool, glowing gel.
+		Tooltip:
+			'''
+			A cool, glowing gel
+			Used to craft lights and charms
+			'''
 	}
 
 	AstralSceptre: {
@@ -25,12 +29,65 @@ Items: {
 			Great for crowd control!
 			'''
 	}
+
+	LumenstoneBlock: {
+		DisplayName: Lumenstone Block
+		Tooltip: ""
+	}
+
+	LumenstoneWall: {
+		DisplayName: Lumenstone Wall
+		Tooltip: ""
+	}
+
+	LumenShard: {
+		DisplayName: Lumen Shard
+		Tooltip: A sliver of cavern crystal that holds a faint light
+	}
+
+	LuminousLantern: {
+		DisplayName: Luminous Lantern
+		Tooltip: ""
+	}
+
+	LumenTorch: {
+		DisplayName: Lumen Torch
+		Tooltip: Can be placed in water
+	}
+
+	GloomlightStaff: {
+		DisplayName: Gloomlight Staff
+		Tooltip: Fires a slow globule that bursts into a small electric pulse on impact
+	}
+
+	JellyheartPendant: {
+		DisplayName: Jellyheart Pendant
+		Tooltip:
+			'''
+			Provides light
+			Increases underwater breath
+			'''
+	}
+
+	Glowfin: {
+		DisplayName: Glowfin
+		Tooltip: Its fins still glow faintly
+	}
+
+	LuminescencePotion: {
+		DisplayName: Luminescence Potion
+		Tooltip:
+			'''
+			Emits a gentle light
+			Light is brighter while underwater
+			'''
+	}
 }
 
 NPCs: {
 	GloomJelly: {
 		DisplayName: Gloom Jelly
-		Bestiary: A slow cavern drifter. It brightens, then lets off a short electric pulse.
+		Bestiary: A slow drifter found only in the Luminous Caverns. It brightens, then lets off a short electric pulse.
 	}
 
 	CyberZombie: {
@@ -43,4 +100,87 @@ Projectiles: {
 	AstralSceptreProjectile.DisplayName: Astral Sceptre Projectile
 	VoidcallerProjectile.DisplayName: Voidcaller Orb
 	CyberZombieLaser.DisplayName: Cyber Laser
+	GloomlightGlobule.DisplayName: Gloomlight Globule
+}
+
+Buffs: {
+	LuminescenceBuff: {
+		DisplayName: Luminescence
+		Description: Emitting a gentle light, brighter underwater
+	}
+}
+
+Biomes: {
+	LuminousCavernsBiome: {
+		DisplayName: Luminous Caverns
+		TownNPCDialogueName: the Luminous Caverns Biome
+	}
+}
+
+Tiles: {
+	Lumenstone.MapEntry: Lumenstone
+	LuminousMoss.MapEntry: Luminous Moss
+	Glowvine.MapEntry: Glowvine
+	Lumenblossom.MapEntry: Lumenblossom
+	LumenShards.MapEntry: Lumen Shards
+}
+
+WorldGen: {
+	LuminousCaverns: Carving luminous caverns
+	LuminousCavernsGrowth: Growing luminous moss
+}
+
+Configs: {
+	LuminousCavernsConfig: {
+		DisplayName: Luminous Caverns
+
+		Small: {
+			Label: Small worlds
+			Tooltip: How many Luminous Caverns a small world gets, and how big each one is
+		}
+
+		Medium: {
+			Label: Medium worlds
+			Tooltip: How many Luminous Caverns a medium world gets, and how big each one is
+		}
+
+		Large: {
+			Label: Large worlds
+			Tooltip: How many Luminous Caverns a large world gets, and how big each one is
+		}
+	}
+
+	BiomeSizeSettings: {
+		Tooltip: Applies to newly generated worlds only
+
+		MinCount: {
+			Label: Fewest biomes
+			Tooltip: Fewest Luminous Caverns placed in the world. Biomes with no valid spot are skipped
+		}
+
+		MaxCount: {
+			Label: Most biomes
+			Tooltip: Most Luminous Caverns placed in the world
+		}
+
+		MinWidth: {
+			Label: Minimum width
+			Tooltip: Narrowest biome, in tiles
+		}
+
+		MaxWidth: {
+			Label: Maximum width
+			Tooltip: Widest biome, in tiles
+		}
+
+		MinHeight: {
+			Label: Minimum height
+			Tooltip: Shortest biome, in tiles
+		}
+
+		MaxHeight: {
+			Label: Maximum height
+			Tooltip: Tallest biome, in tiles
+		}
+	}
 }

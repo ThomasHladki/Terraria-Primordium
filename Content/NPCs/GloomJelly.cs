@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
+using Primordium.Content.Biomes;
 using Primordium.Content.Items.Materials;
+using Primordium.Content.Items.Weapons;
 using Terraria;
 using Terraria.Audio;
 using Terraria.DataStructures;
@@ -8,7 +10,6 @@ using Terraria.GameContent.Bestiary;
 using Terraria.GameContent.ItemDropRules;
 using Terraria.ID;
 using Terraria.ModLoader;
-using Terraria.ModLoader.Utilities;
 
 namespace Primordium.Content.NPCs
 {
@@ -23,6 +24,8 @@ namespace Primordium.Content.NPCs
 		private const float PulseKnockback = 5f;
 		private const int ClassicContactDamage = 20;
 		private const int ClassicPulseDamage = 12;
+		private const float SpawnWeight = 0.08f;
+		private const int StaffDropChance = 20;
 
 		public override void SetStaticDefaults() {
 			Main.npcFrameCount[Type] = 4;
@@ -43,6 +46,7 @@ namespace Primordium.Content.NPCs
 			NPC.aiStyle = NPCAIStyleID.Flying;
 			// Type is swapped to an Eater of Souls while vanilla AI runs, so the chase and wall bounce stay on.
 			AIType = NPCID.EaterofSouls;
+			SpawnModBiomes = new[] { ModContent.GetInstance<LuminousCavernsBiome>().Type };
 		}
 
 		public override void ApplyDifficultyAndPlayerScaling(int numPlayers, float balance, float bossAdjustment) {
@@ -51,22 +55,22 @@ namespace Primordium.Content.NPCs
 
 		public override void SetBestiary(BestiaryDatabase database, BestiaryEntry bestiaryEntry) {
 			bestiaryEntry.Info.AddRange(new List<IBestiaryInfoElement> {
-				BestiaryDatabaseNPCsPopulator.CommonTags.SpawnConditions.Biomes.Caverns,
 				new FlavorTextBestiaryInfoElement("Mods.Primordium.NPCs.GloomJelly.Bestiary")
 			});
 		}
 
 		public override float SpawnChance(NPCSpawnInfo spawnInfo) {
-			if (Main.hardMode) {
+			if (Main.hardMode || spawnInfo.Water || spawnInfo.Invasion || !spawnInfo.Player.InModBiome<LuminousCavernsBiome>()) {
 				return 0f;
 			}
 
-			// Uncommon in the caverns: one encounter across a stretch of exploration, not every screen.
-			return SpawnCondition.Cavern.Chance * 0.04f;
+			// Weighed against the reduced cavern pool in LuminousCavernsSpawnPool: about one spawn in four.
+			return SpawnWeight;
 		}
 
 		public override void ModifyNPCLoot(NPCLoot npcLoot) {
 			npcLoot.Add(ItemDropRule.Common(ModContent.ItemType<LuminousGel>(), 1, 1, 2));
+			npcLoot.Add(ItemDropRule.ByCondition(Condition.DownedEowOrBoc.ToDropCondition(ShowItemDropInUI.Always), ModContent.ItemType<GloomlightStaff>(), StaffDropChance));
 		}
 
 		public override void FindFrame(int frameHeight) {
