@@ -437,9 +437,8 @@ Tools/
 # Local sprite generation. Weights and ComfyUI live outside the repo.
 artifacts/
 *.safetensors
-*.ckpt
+*.ckptI
 *.gguf
 *.mdc
 SPRITE_GENERATION.md
-*.md
 /.cursor
