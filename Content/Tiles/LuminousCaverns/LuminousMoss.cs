@@ -16,8 +16,8 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 			Main.tileSolid[Type] = true;
 			Main.tileBlockLight[Type] = true;
 			Main.tileLighted[Type] = true;
-			// Same framing path as green moss. The host block is lumenstone, so the glow wraps every open edge
-			// and blends into lumenstone where another block covers it. tileMoss would force the host to be stone.
+			// Grass selects the edge frame. tileMoss would force the host to be stone, so the host stays lumenstone.
+			TileID.Sets.Grass[Type] = true;
 			TileID.Sets.NeedsGrassFraming[Type] = true;
 			TileID.Sets.NeedsGrassFramingDirt[Type] = ModContent.TileType<Lumenstone>();
 
@@ -29,6 +29,25 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 			DustType = DustID.BlueMoss;
 			HitSound = SoundID.Tink;
 			AddMapEntry(new Color(40, 150, 150), CreateMapEntryName());
+		}
+
+		public override void ModifyFrameMerge(int i, int j, ref int up, ref int down, ref int left, ref int right, ref int upLeft, ref int upRight, ref int downLeft, ref int downRight) {
+			// A side only grows moss when it faces air. Any solid block covers that side, the same as vanilla moss.
+			Cover(i, j - 1, ref up);
+			Cover(i, j + 1, ref down);
+			Cover(i - 1, j, ref left);
+			Cover(i + 1, j, ref right);
+			Cover(i - 1, j - 1, ref upLeft);
+			Cover(i + 1, j - 1, ref upRight);
+			Cover(i - 1, j + 1, ref downLeft);
+			Cover(i + 1, j + 1, ref downRight);
+		}
+
+		private static void Cover(int x, int y, ref int merge) {
+			Tile tile = Framing.GetTileSafely(x, y);
+			if (tile.HasTile && Main.tileSolid[tile.TileType] && !Main.tileSolidTop[tile.TileType]) {
+				merge = ModContent.TileType<LuminousMoss>();
+			}
 		}
 
 		public override void ModifyLight(int i, int j, ref float r, ref float g, ref float b) {
@@ -46,6 +65,8 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 		}
 
 		public override void RandomUpdate(int i, int j) {
+			LumenShards.TryGrow(i, j);
+
 			// Green moss scans the 3x3 around itself and grows onto the stone beside it. SpreadGrass has to be
 			// aimed at that stone: calling it on the moss tile itself does nothing.
 			int lumenstone = ModContent.TileType<Lumenstone>();

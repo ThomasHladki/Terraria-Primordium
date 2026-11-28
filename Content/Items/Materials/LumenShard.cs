@@ -11,8 +11,8 @@ namespace Primordium.Content.Items.Materials
 		}
 
 		public override void SetDefaults() {
-			Item.width = 14;
-			Item.height = 20;
+			Item.width = 16;
+			Item.height = 32;
 			Item.maxStack = Item.CommonMaxStack;
 			Item.value = Item.sellPrice(copper: 40);
 			Item.rare = ItemRarityID.Blue;

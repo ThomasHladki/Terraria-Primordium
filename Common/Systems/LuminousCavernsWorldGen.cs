@@ -73,6 +73,19 @@ namespace Primordium.Common.Systems
 			}
 		}
 
+		public override void OnWorldLoad() {
+			// Frames are saved with the world. Reframe moss so a side against a block drops its moss.
+			int moss = ModContent.TileType<LuminousMoss>();
+			for (int x = 0; x < Main.maxTilesX; x++) {
+				for (int y = 0; y < Main.maxTilesY; y++) {
+					Tile tile = Main.tile[x, y];
+					if (tile.HasTile && tile.TileType == moss) {
+						WorldGen.TileFrame(x, y, resetFrame: true, noBreak: true);
+					}
+				}
+			}
+		}
+
 		public override void PostWorldGen() {
 			SavedBounds.Clear();
 			foreach (BiomeArea area in Areas) {

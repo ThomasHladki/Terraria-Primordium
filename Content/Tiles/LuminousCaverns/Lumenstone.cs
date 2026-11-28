@@ -26,5 +26,9 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 		public override void NumDust(int i, int j, bool fail, ref int num) {
 			num = fail ? 1 : 3;
 		}
+
+		public override void RandomUpdate(int i, int j) {
+			LumenShards.TryGrow(i, j);
+		}
 	}
 }

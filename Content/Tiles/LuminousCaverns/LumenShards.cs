@@ -52,9 +52,92 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 		}
 
 		public override void ModifyLight(int i, int j, ref float r, ref float g, ref float b) {
-			r = 0.2f;
-			g = 0.62f;
-			b = 0.78f;
+			// The half that touches the stone stays dark. Only the tip glows, and only a little.
+			Tile above = Framing.GetTileSafely(i, j - 1);
+			Tile below = Framing.GetTileSafely(i, j + 1);
+			bool anchored = above.HasTile && IsHost(above.TileType) || below.HasTile && IsHost(below.TileType);
+			if (anchored) {
+				return;
+			}
+
+			r = 0.05f;
+			g = 0.14f;
+			b = 0.18f;
+		}
+
+		// Hallow crystals sprout from pearlstone a few at a time. These do the same on lumenstone and luminous moss.
+		public static void TryGrow(int i, int j) {
+			if (j <= Main.rockLayer && !Main.remixWorld) {
+				return;
+			}
+
+			if (!WorldGen.genRand.NextBool(5)) {
+				return;
+			}
+
+			int direction = WorldGen.genRand.Next(4);
+			int x = i + (direction == 0 ? -1 : direction == 1 ? 1 : 0);
+			int y = j + (direction == 2 ? -1 : direction == 3 ? 1 : 0);
+			if (!WorldGen.InWorld(x, y, 10) || Main.tile[x, y].HasTile || Main.tile[x, y].LiquidAmount > 0) {
+				return;
+			}
+
+			if (CountNearby(i, j) >= 2) {
+				return;
+			}
+
+			if (direction == 2 && IsOpen(x, y - 1)) {
+				Place(x, y, ceiling: false);
+			}
+			else if (direction == 3 && IsOpen(x, y + 1)) {
+				Place(x, y, ceiling: true);
+			}
+		}
+
+		private static void Place(int x, int y, bool ceiling) {
+			int type = ModContent.TileType<LumenShards>();
+			if (ceiling) {
+				WorldGen.PlaceObject(x, y, type, mute: true, style: 0, alternate: CeilingAlternate);
+			}
+			else {
+				WorldGen.PlaceObject(x, y, type, mute: true);
+			}
+
+			if (Main.netMode == NetmodeID.Server) {
+				NetMessage.SendTileSquare(-1, x - 1, y - 1, 3, 3);
+			}
+		}
+
+		private static int CountNearby(int i, int j) {
+			int type = ModContent.TileType<LumenShards>();
+			int count = 0;
+			for (int x = i - 6; x <= i + 6; x++) {
+				for (int y = j - 6; y <= j + 6; y++) {
+					if (!WorldGen.InWorld(x, y, 1)) {
+						continue;
+					}
+
+					Tile tile = Main.tile[x, y];
+					if (tile.HasTile && tile.TileType == type && tile.TileFrameY == 0) {
+						count++;
+					}
+				}
+			}
+
+			return count;
+		}
+
+		private static bool IsOpen(int x, int y) {
+			if (!WorldGen.InWorld(x, y, 1)) {
+				return false;
+			}
+
+			Tile tile = Main.tile[x, y];
+			return !tile.HasTile && tile.LiquidAmount == 0;
+		}
+
+		private static bool IsHost(int type) {
+			return type == ModContent.TileType<Lumenstone>() || type == ModContent.TileType<LuminousMoss>();
 		}
 	}
 }
