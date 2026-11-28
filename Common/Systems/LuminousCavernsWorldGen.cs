@@ -10,6 +10,7 @@ using Terraria.ID;
 using Terraria.IO;
 using Terraria.Localization;
 using Terraria.ModLoader;
+using Terraria.ModLoader.IO;
 using Terraria.WorldBuilding;
 
 namespace Primordium.Common.Systems
@@ -23,9 +24,18 @@ namespace Primordium.Common.Systems
 		private const int ShimmerClearance = 120;
 		private const int BiomeEdgeClearance = 40;
 		private const int EntranceReach = 30;
-		private const double WallCoverage = -0.2;
-
+		private const int MinimumWidth = 40;
+		private const int MinimumHeight = 30;
 		private static readonly List<BiomeArea> Areas = new();
+		private static readonly List<Rectangle> SavedBounds = new();
+		private static List<Rectangle> discovered;
+
+		private enum SpotCheck
+		{
+			Normal,
+			Relaxed,
+			HardOnly,
+		}
 
 		private sealed class BiomeArea
 		{
@@ -64,19 +74,77 @@ namespace Primordium.Common.Systems
 		}
 
 		public override void PostWorldGen() {
+			SavedBounds.Clear();
+			foreach (BiomeArea area in Areas) {
+				SavedBounds.Add(area.Bounds);
+			}
+
 			Areas.Clear();
+			discovered = null;
+		}
+
+		public override void SaveWorldData(TagCompound tag) {
+			int count = SavedBounds.Count;
+			int[] x = new int[count];
+			int[] y = new int[count];
+			int[] width = new int[count];
+			int[] height = new int[count];
+			for (int i = 0; i < count; i++) {
+				Rectangle bounds = SavedBounds[i];
+				x[i] = bounds.X;
+				y[i] = bounds.Y;
+				width[i] = bounds.Width;
+				height[i] = bounds.Height;
+			}
+
+			tag["luminousX"] = x;
+			tag["luminousY"] = y;
+			tag["luminousWidth"] = width;
+			tag["luminousHeight"] = height;
+		}
+
+		public override void LoadWorldData(TagCompound tag) {
+			SavedBounds.Clear();
+			discovered = null;
+			int[] x = tag.GetIntArray("luminousX");
+			int[] y = tag.GetIntArray("luminousY");
+			int[] width = tag.GetIntArray("luminousWidth");
+			int[] height = tag.GetIntArray("luminousHeight");
+			int count = Math.Min(Math.Min(x.Length, y.Length), Math.Min(width.Length, height.Length));
+			for (int i = 0; i < count; i++) {
+				if (width[i] > 0 && height[i] > 0) {
+					SavedBounds.Add(new Rectangle(x[i], y[i], width[i], height[i]));
+				}
+			}
+		}
+
+		public override void OnWorldUnload() {
+			Areas.Clear();
+			SavedBounds.Clear();
+			discovered = null;
+		}
+
+		public static IReadOnlyList<Rectangle> Locate() {
+			if (SavedBounds.Count > 0) {
+				return SavedBounds;
+			}
+
+			discovered ??= DiscoverExisting();
+			return discovered;
 		}
 
 		private void GenerateTerrain(GenerationProgress progress, GameConfiguration configuration) {
 			progress.Message = Language.GetTextValue("Mods.Primordium.WorldGen.LuminousCaverns");
 			Areas.Clear();
+			SavedBounds.Clear();
+			discovered = null;
 
 			BiomeSizeSettings size = PickSize();
 			int count = WorldGen.genRand.Next(Math.Min(size.MinCount, size.MaxCount), Math.Max(size.MinCount, size.MaxCount) + 1);
 			for (int n = 0; n < count; n++) {
 				progress.Set(n / (double)count);
 				if (!TryFindSpot(size, out Rectangle bounds)) {
-					Mod.Logger.Info($"Luminous Caverns: no valid spot for biome {n + 1} of {count}, skipped.");
+					Mod.Logger.Warn($"Luminous Caverns: no cavern gap fit biome {n + 1} of {count}, even at the minimum size.");
 					continue;
 				}
 
@@ -97,45 +165,111 @@ namespace Primordium.Common.Systems
 
 		private static bool TryFindSpot(BiomeSizeSettings size, out Rectangle bounds) {
 			bounds = default;
+			if (!CavernBand(out int top, out int bottom, out int edge)) {
+				return false;
+			}
+
 			int minWidth = Math.Min(size.MinWidth, size.MaxWidth);
 			int maxWidth = Math.Max(size.MinWidth, size.MaxWidth);
 			int minHeight = Math.Min(size.MinHeight, size.MaxHeight);
 			int maxHeight = Math.Max(size.MinHeight, size.MaxHeight);
-			int top = (int)Main.rockLayer + 15;
-			int bottom = Main.UnderworldLayer - 50;
-			int edge = (int)(Main.maxTilesX * 0.14);
+			ClampToCavern(ref minWidth, ref maxWidth, ref minHeight, ref maxHeight, top, bottom, edge);
 
 			for (int attempt = 0; attempt < PlacementAttempts; attempt++) {
-				int width = WorldGen.genRand.Next(minWidth, maxWidth + 1);
-				int height = Math.Min(WorldGen.genRand.Next(minHeight, maxHeight + 1), bottom - top);
-				if (height < 30 || Main.maxTilesX - edge - width <= edge) {
-					return false;
-				}
-
-				int x = WorldGen.genRand.Next(edge, Main.maxTilesX - edge - width);
-				int y = WorldGen.genRand.Next(top, bottom - height + 1);
-				Rectangle candidate = new(x, y, width, height);
-				if (IsValidSpot(candidate)) {
-					bounds = candidate;
+				if (TryRandomSpot(minWidth, maxWidth, minHeight, maxHeight, top, bottom, edge, SpotCheck.Normal, out bounds)) {
 					return true;
+				}
+			}
+
+			ModContent.GetInstance<LuminousCavernsWorldGen>().Mod.Logger.Info(
+				$"Luminous Caverns: configured size did not fit. Retrying at {minWidth}x{minHeight}.");
+			for (int attempt = 0; attempt < PlacementAttempts; attempt++) {
+				if (TryRandomSpot(minWidth, minWidth, minHeight, minHeight, top, bottom, edge, SpotCheck.Relaxed, out bounds)) {
+					return true;
+				}
+			}
+
+			if (TrySweep(minWidth, minHeight, top, bottom, edge, out bounds)) {
+				ModContent.GetInstance<LuminousCavernsWorldGen>().Mod.Logger.Info(
+					$"Luminous Caverns: fallback spot at {bounds.X},{bounds.Y} size {bounds.Width}x{bounds.Height}.");
+				return true;
+			}
+
+			return false;
+		}
+
+		private static bool CavernBand(out int top, out int bottom, out int edge) {
+			top = (int)Main.rockLayer + 15;
+			bottom = Main.UnderworldLayer - 50;
+			edge = (int)(Main.maxTilesX * 0.14);
+			return bottom - top >= MinimumHeight && Main.maxTilesX - (edge * 2) >= MinimumWidth;
+		}
+
+		private static void ClampToCavern(ref int minWidth, ref int maxWidth, ref int minHeight, ref int maxHeight, int top, int bottom, int edge) {
+			int span = bottom - top;
+			int fitWidth = Main.maxTilesX - (edge * 2);
+			minWidth = Math.Clamp(minWidth, MinimumWidth, fitWidth);
+			maxWidth = Math.Clamp(maxWidth, minWidth, fitWidth);
+			minHeight = Math.Clamp(minHeight, MinimumHeight, span);
+			maxHeight = Math.Clamp(maxHeight, minHeight, span);
+		}
+
+		private static bool TryRandomSpot(int minWidth, int maxWidth, int minHeight, int maxHeight, int top, int bottom, int edge, SpotCheck check, out Rectangle bounds) {
+			bounds = default;
+			int width = minWidth == maxWidth ? minWidth : WorldGen.genRand.Next(minWidth, maxWidth + 1);
+			int height = minHeight == maxHeight ? minHeight : WorldGen.genRand.Next(minHeight, maxHeight + 1);
+			int xMax = Main.maxTilesX - edge - width;
+			int yMax = bottom - height + 1;
+			if (xMax <= edge || yMax <= top) {
+				return false;
+			}
+
+			Rectangle candidate = new(WorldGen.genRand.Next(edge, xMax), WorldGen.genRand.Next(top, yMax), width, height);
+			if (!IsValidSpot(candidate, check)) {
+				return false;
+			}
+
+			bounds = candidate;
+			return true;
+		}
+
+		private static bool TrySweep(int width, int height, int top, int bottom, int edge, out Rectangle bounds) {
+			bounds = default;
+			int xMax = Main.maxTilesX - edge - width;
+			int yMax = bottom - height;
+			if (xMax < edge || yMax < top) {
+				return false;
+			}
+
+			int stepX = Math.Max(16, width / 4);
+			int stepY = Math.Max(12, height / 4);
+			for (int x = edge; x <= xMax; x += stepX) {
+				for (int y = top; y <= yMax; y += stepY) {
+					Rectangle candidate = new(x, y, width, height);
+					if (IsValidSpot(candidate, SpotCheck.HardOnly)) {
+						bounds = candidate;
+						return true;
+					}
 				}
 			}
 
 			return false;
 		}
 
-		private static bool IsValidSpot(Rectangle area) {
+		private static bool IsValidSpot(Rectangle area, SpotCheck check) {
 			int centerX = area.Center.X;
 			int centerY = area.Center.Y;
 			int halfWidth = area.Width / 2;
 
-			if (Math.Abs(centerX - Main.spawnTileX) < halfWidth + SpawnClearance) {
+			if (check != SpotCheck.HardOnly && Math.Abs(centerX - Main.spawnTileX) < halfWidth + SpawnClearance) {
 				return false;
 			}
 
-			(int jungleLeft, int jungleRight) = JungleSpan();
-			if (area.Right > jungleLeft && area.Left < jungleRight) {
-				return false;
+			if (check != SpotCheck.HardOnly) {
+				(int jungleLeft, int jungleRight) = JungleSpan();
+				if (area.Right > jungleLeft && area.Left < jungleRight) {
+					return false;
+				}
 			}
 
 			if (GenVars.dungeonX > 0 && Math.Abs(centerX - GenVars.dungeonX) < halfWidth + DungeonClearance) {
@@ -148,16 +282,18 @@ namespace Primordium.Common.Systems
 				return false;
 			}
 
-			Rectangle desert = GenVars.UndergroundDesertLocation;
-			desert.Inflate(BiomeEdgeClearance, BiomeEdgeClearance);
-			if (desert.Width > BiomeEdgeClearance * 2 && desert.Intersects(area)) {
-				return false;
-			}
+			if (check != SpotCheck.HardOnly) {
+				Rectangle desert = GenVars.UndergroundDesertLocation;
+				desert.Inflate(BiomeEdgeClearance, BiomeEdgeClearance);
+				if (desert.Width > BiomeEdgeClearance * 2 && desert.Intersects(area)) {
+					return false;
+				}
 
-			if (GenVars.snowOriginRight > GenVars.snowOriginLeft
-				&& area.Right > GenVars.snowOriginLeft - BiomeEdgeClearance * 2
-				&& area.Left < GenVars.snowOriginRight + BiomeEdgeClearance * 2) {
-				return false;
+				if (GenVars.snowOriginRight > GenVars.snowOriginLeft
+					&& area.Right > GenVars.snowOriginLeft - BiomeEdgeClearance * 2
+					&& area.Left < GenVars.snowOriginRight + BiomeEdgeClearance * 2) {
+					return false;
+				}
 			}
 
 			foreach (BiomeArea other in Areas) {
@@ -168,7 +304,7 @@ namespace Primordium.Common.Systems
 				}
 			}
 
-			return GenVars.structures.CanPlace(area, StructurePadding) && ScanTiles(area);
+			return GenVars.structures.CanPlace(area, StructurePadding) && ScanTiles(area, check);
 		}
 
 		private static (int, int) JungleSpan() {
@@ -183,9 +319,9 @@ namespace Primordium.Common.Systems
 			return (left, right);
 		}
 
-		// Structures, evil stone, and other biomes reject the spot outright. Mud, sand, ice, and mushroom
-		// grass are allowed in small stray patches, which every cavern has.
-		private static bool ScanTiles(Rectangle area) {
+		// Dungeon, shimmer, and the temple reject the spot. Cabins and chests are props and do not.
+		// Mud, sand, ice, mushroom grass, and a little evil stone are allowed as stray patches.
+		private static bool ScanTiles(Rectangle area, SpotCheck check) {
 			int softLimit = area.Width * area.Height / 100;
 			int soft = 0;
 			int left = Math.Max(area.Left - 4, 10);
@@ -200,7 +336,7 @@ namespace Primordium.Common.Systems
 						return false;
 					}
 
-					if (tile.WallType > 0 && (Main.wallDungeon[tile.WallType] || Main.wallHouse[tile.WallType])) {
+					if (tile.WallType > 0 && Main.wallDungeon[tile.WallType]) {
 						return false;
 					}
 
@@ -209,11 +345,19 @@ namespace Primordium.Common.Systems
 					}
 
 					int type = tile.TileType;
-					if (IsHardForbidden(type)) {
+					if (IsAlwaysForbidden(type)) {
 						return false;
 					}
 
-					if (IsSoftForbidden(type) && ++soft > softLimit) {
+					if (check != SpotCheck.Normal) {
+						continue;
+					}
+
+					if (type >= TileID.Count && Main.tileFrameImportant[type]) {
+						return false;
+					}
+
+					if ((IsEvil(type) || IsSoftForbidden(type)) && ++soft > softLimit) {
 						return false;
 					}
 				}
@@ -222,18 +366,13 @@ namespace Primordium.Common.Systems
 			return true;
 		}
 
-		private static bool IsHardForbidden(int type) {
-			if (Main.tileDungeon[type] || TileID.Sets.BasicChest[type]) {
-				return true;
-			}
+		private static bool IsAlwaysForbidden(int type) {
+			return Main.tileDungeon[type] || type is TileID.LihzahrdBrick or TileID.Hive or TileID.ShimmerBlock;
+		}
 
-			if (type >= TileID.Count && Main.tileFrameImportant[type]) {
-				return true;
-			}
-
-			return type is TileID.LihzahrdBrick or TileID.Ebonstone or TileID.Crimstone or TileID.CorruptGrass
-				or TileID.CrimsonGrass or TileID.Ebonsand or TileID.Crimsand or TileID.Hive or TileID.ShimmerBlock
-				or TileID.Demonite or TileID.Crimtane;
+		private static bool IsEvil(int type) {
+			return type is TileID.Ebonstone or TileID.Crimstone or TileID.CorruptGrass or TileID.CrimsonGrass
+				or TileID.Ebonsand or TileID.Crimsand or TileID.Demonite or TileID.Crimtane;
 		}
 
 		private static bool IsSoftForbidden(int type) {
@@ -245,13 +384,84 @@ namespace Primordium.Common.Systems
 				or TileID.IceBlock or TileID.SnowBlock or TileID.MushroomGrass;
 		}
 
+		private static List<Rectangle> DiscoverExisting() {
+			ushort lumenstone = (ushort)ModContent.TileType<Lumenstone>();
+			ushort moss = (ushort)ModContent.TileType<LuminousMoss>();
+			List<Rectangle> clusters = new();
+			for (int x = 10; x < Main.maxTilesX - 10; x++) {
+				for (int y = 10; y < Main.maxTilesY - 10; y++) {
+					Tile tile = Main.tile[x, y];
+					if (!tile.HasTile || (tile.TileType != lumenstone && tile.TileType != moss)) {
+						continue;
+					}
+
+					bool joined = false;
+					for (int i = 0; i < clusters.Count; i++) {
+						Rectangle cluster = clusters[i];
+						cluster.Inflate(80, 80);
+						if (!cluster.Contains(x, y)) {
+							continue;
+						}
+
+						Rectangle grown = clusters[i];
+						grown.X = Math.Min(grown.X, x);
+						grown.Y = Math.Min(grown.Y, y);
+						grown.Width = Math.Max(grown.Right, x + 1) - grown.X;
+						grown.Height = Math.Max(grown.Bottom, y + 1) - grown.Y;
+						clusters[i] = grown;
+						joined = true;
+						break;
+					}
+
+					if (!joined) {
+						clusters.Add(new Rectangle(x, y, 1, 1));
+					}
+				}
+			}
+
+			return clusters;
+		}
+
+		public static bool TryStand(Rectangle area, out Point tile) {
+			int originX = Math.Clamp(area.Center.X, area.Left, Math.Max(area.Left, area.Right - 1));
+			int originY = Math.Clamp(area.Center.Y, area.Top, Math.Max(area.Top, area.Bottom - 1));
+			Point closest = new(originX, originY);
+			int best = int.MaxValue;
+			for (int y = area.Top; y < area.Bottom; y++) {
+				for (int x = area.Left; x < area.Right; x++) {
+					if (!IsOpen(x, y) || !IsOpen(x, y - 1) || !IsOpen(x, y - 2)) {
+						continue;
+					}
+
+					if (!WorldGen.InWorld(x, y + 1) || !Main.tile[x, y + 1].HasTile) {
+						continue;
+					}
+
+					int distance = Math.Abs(x - originX) + Math.Abs(y - originY);
+					if (distance < best) {
+						best = distance;
+						closest = new Point(x, y);
+					}
+				}
+			}
+
+			tile = closest;
+			return WorldGen.InWorld(tile.X, tile.Y);
+		}
+
+		private static bool IsOpen(int x, int y) {
+			return WorldGen.InWorld(x, y, 10) && !Main.tile[x, y].HasTile;
+		}
+
 		private static BiomeArea Build(Rectangle bounds) {
 			BiomeArea area = new() { Bounds = bounds, Mask = BuildMask(bounds) };
 			Convert(area);
 			CarveChambers(area);
 			ConnectChambers(area);
 			CarveEntrances(area);
+			DrainLiquids(area);
 			FillPools(area);
+			FrameWalls(area);
 			return area;
 		}
 
@@ -277,8 +487,7 @@ namespace Primordium.Common.Systems
 		private static void Convert(BiomeArea area) {
 			ushort lumenstone = (ushort)ModContent.TileType<Lumenstone>();
 			ushort wall = (ushort)ModContent.WallType<LumenstoneWallUnsafe>();
-			double phaseX = WorldGen.genRand.NextDouble() * 100;
-			double phaseY = WorldGen.genRand.NextDouble() * 100;
+			double phase = WorldGen.genRand.NextDouble() * 100;
 
 			for (int x = area.Bounds.Left; x < area.Bounds.Right; x++) {
 				for (int y = area.Bounds.Top; y < area.Bounds.Bottom; y++) {
@@ -291,18 +500,20 @@ namespace Primordium.Common.Systems
 						tile.TileType = lumenstone;
 					}
 
-					if (tile.LiquidAmount > 0 && tile.LiquidType == LiquidID.Lava) {
-						tile.LiquidType = LiquidID.Water;
-					}
-
-					// Patchy walls, so the biome's own background shows through in the open parts.
-					double noise = Math.Sin(x * 0.11 + phaseX) + Math.Sin(y * 0.17 + phaseY) + Math.Sin((x + y) * 0.07);
+					// Irregular patches, not sine bands, so the wall doesn't read as a repeating stamp.
 					bool naturalWall = tile.WallType > 0 && !Main.wallHouse[tile.WallType] && !Main.wallDungeon[tile.WallType];
-					if (naturalWall || (tile.WallType == 0 && noise > WallCoverage)) {
+					if (naturalWall || (tile.WallType == 0 && IrregularPatch(x, y, phase))) {
 						tile.WallType = wall;
 					}
 				}
 			}
+		}
+
+		private static bool IrregularPatch(int x, int y, double phase) {
+			double coarse = Math.Sin(x * 0.035 + phase) * Math.Sin(y * 0.028 + phase * 1.3);
+			double grain = 0.45 * Math.Sin(x * 0.11 - y * 0.07 + phase * 0.4);
+			double drift = 0.3 * Math.Sin((x + y) * 0.018 + phase);
+			return coarse + grain + drift > 0.2;
 		}
 
 		private static void CarveChambers(BiomeArea area) {
@@ -420,11 +631,35 @@ namespace Primordium.Common.Systems
 			}
 		}
 
+		private static void DrainLiquids(BiomeArea area) {
+			for (int x = area.Bounds.Left; x < area.Bounds.Right; x++) {
+				for (int y = area.Bounds.Top; y < area.Bounds.Bottom; y++) {
+					if (!area.Contains(x, y)) {
+						continue;
+					}
+
+					Tile tile = Main.tile[x, y];
+					tile.LiquidAmount = 0;
+				}
+			}
+		}
+
 		private static void FillPools(BiomeArea area) {
-			int[] depths = { 2, 3, 5, 8, 11 };
-			foreach (Point chamber in area.Chambers) {
-				if (WorldGen.genRand.NextFloat() > 0.65f) {
-					continue;
+			if (area.Chambers.Count == 0) {
+				return;
+			}
+
+			int pools = WorldGen.genRand.Next(1, 3);
+			List<Point> spots = new(area.Chambers);
+			for (int i = spots.Count - 1; i > 0 && pools > 0; i--) {
+				int swap = WorldGen.genRand.Next(i + 1);
+				(spots[i], spots[swap]) = (spots[swap], spots[i]);
+			}
+
+			int placed = 0;
+			foreach (Point chamber in spots) {
+				if (placed >= pools) {
+					break;
 				}
 
 				int x = chamber.X;
@@ -437,11 +672,11 @@ namespace Primordium.Common.Systems
 					continue;
 				}
 
-				int depth = depths[WorldGen.genRand.Next(depths.Length)];
-				int halfWidth = WorldGen.genRand.Next(4, 13);
+				int depth = WorldGen.genRand.Next(2, 5);
+				int halfWidth = WorldGen.genRand.Next(3, 7);
 				for (int dx = -halfWidth; dx <= halfWidth; dx++) {
-					double t = dx / (double)halfWidth;
-					int columnDepth = (int)Math.Round(depth * Math.Sqrt(1 - t * t));
+					double t = halfWidth == 0 ? 0 : dx / (double)halfWidth;
+					int columnDepth = (int)Math.Round(depth * Math.Sqrt(Math.Max(0, 1 - t * t)));
 					for (int dy = 0; dy < columnDepth; dy++) {
 						int px = x + dx;
 						int py = y + dy;
@@ -457,6 +692,19 @@ namespace Primordium.Common.Systems
 						tile.HasTile = false;
 						tile.LiquidType = LiquidID.Water;
 						tile.LiquidAmount = byte.MaxValue;
+					}
+				}
+
+				placed++;
+			}
+		}
+
+		private static void FrameWalls(BiomeArea area) {
+			ushort wall = (ushort)ModContent.WallType<LumenstoneWallUnsafe>();
+			for (int x = area.Bounds.Left; x < area.Bounds.Right; x++) {
+				for (int y = area.Bounds.Top; y < area.Bounds.Bottom; y++) {
+					if (area.Contains(x, y) && Main.tile[x, y].WallType == wall) {
+						WorldGen.SquareWallFrame(x, y, true);
 					}
 				}
 			}
@@ -495,7 +743,7 @@ namespace Primordium.Common.Systems
 		}
 
 		private static bool CanCarve(int type) {
-			return !Main.tileFrameImportant[type] && !Main.tileDungeon[type] && !IsHardForbidden(type);
+			return !Main.tileFrameImportant[type] && !IsAlwaysForbidden(type);
 		}
 
 		private void Decorate(GenerationProgress progress, GameConfiguration configuration) {
@@ -514,7 +762,9 @@ namespace Primordium.Common.Systems
 				for (int x = b.Left; x < b.Right; x++) {
 					for (int y = b.Top; y < b.Bottom; y++) {
 						Tile tile = Main.tile[x, y];
-						if (area.Contains(x, y) && tile.HasTile && tile.TileType == lumenstone && LuminousMoss.HasOpenFace(x, y) && WorldGen.genRand.NextFloat() < 0.75f) {
+						bool exposed = !WorldGen.SolidTile(x - 1, y) || !WorldGen.SolidTile(x + 1, y)
+							|| !WorldGen.SolidTile(x, y - 1) || !WorldGen.SolidTile(x, y + 1);
+						if (area.Contains(x, y) && tile.HasTile && tile.TileType == lumenstone && exposed) {
 							tile.TileType = (ushort)moss;
 						}
 					}
@@ -556,6 +806,9 @@ namespace Primordium.Common.Systems
 						}
 					}
 				}
+
+				// Grass framing picks moss only on faces open to air. Without this, every block stays on the outlined frame.
+				WorldGen.RangeFrame(b.Left - 1, b.Top - 1, b.Right + 1, b.Bottom + 1);
 			}
 		}
 

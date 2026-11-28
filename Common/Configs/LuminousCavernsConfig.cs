@@ -7,11 +7,11 @@ namespace Primordium.Common.Configs
 	{
 		public override ConfigScope Mode => ConfigScope.ServerSide;
 
-		public BiomeSizeSettings Small = new(1, 2, 110, 160, 60, 90);
+		public BiomeSizeSettings Small = new(1, 1, 200, 400, 75, 200);
 
-		public BiomeSizeSettings Medium = new(1, 2, 120, 180, 70, 100);
+		public BiomeSizeSettings Medium = new(1, 2, 250, 450, 15, 250);
 
-		public BiomeSizeSettings Large = new(2, 3, 140, 200, 80, 110);
+		public BiomeSizeSettings Large = new(2, 3, 350, 500, 200, 275);
 	}
 
 	public class BiomeSizeSettings
@@ -22,16 +22,16 @@ namespace Primordium.Common.Configs
 		[Range(0, 6)]
 		public int MaxCount;
 
-		[Range(60, 300)]
+		[Range(60, 700)]
 		public int MinWidth;
 
-		[Range(60, 300)]
+		[Range(60, 700)]
 		public int MaxWidth;
 
-		[Range(40, 160)]
+		[Range(40, 400)]
 		public int MinHeight;
 
-		[Range(40, 160)]
+		[Range(40, 400)]
 		public int MaxHeight;
 
 		public BiomeSizeSettings() : this(1, 2, 120, 180, 70, 100) {

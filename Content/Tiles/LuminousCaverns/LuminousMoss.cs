@@ -9,7 +9,6 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 	public class LuminousMoss : ModTile
 	{
 		// Random updates hit each tile rarely, so these are per-update odds, not per-second odds.
-		private const int SpreadChance = 6;
 		private const int VineChance = 12;
 		private const int BlossomChance = 18;
 
@@ -17,7 +16,8 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 			Main.tileSolid[Type] = true;
 			Main.tileBlockLight[Type] = true;
 			Main.tileLighted[Type] = true;
-			TileID.Sets.Grass[Type] = true;
+			// Same framing path as green moss. The host block is lumenstone, so the glow wraps every open edge
+			// and blends into lumenstone where another block covers it. tileMoss would force the host to be stone.
 			TileID.Sets.NeedsGrassFraming[Type] = true;
 			TileID.Sets.NeedsGrassFramingDirt[Type] = ModContent.TileType<Lumenstone>();
 
@@ -46,8 +46,20 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 		}
 
 		public override void RandomUpdate(int i, int j) {
-			if (WorldGen.genRand.NextBool(SpreadChance)) {
-				TrySpread(i + WorldGen.genRand.Next(-1, 2), j + WorldGen.genRand.Next(-1, 2));
+			// Green moss scans the 3x3 around itself and grows onto the stone beside it. SpreadGrass has to be
+			// aimed at that stone: calling it on the moss tile itself does nothing.
+			int lumenstone = ModContent.TileType<Lumenstone>();
+			for (int x = i - 1; x <= i + 1; x++) {
+				for (int y = j - 1; y <= j + 1; y++) {
+					if ((x == i && y == j) || !WorldGen.InWorld(x, y, 10)) {
+						continue;
+					}
+
+					Tile neighbor = Main.tile[x, y];
+					if (neighbor.HasTile && neighbor.TileType == lumenstone) {
+						WorldGen.SpreadGrass(x, y, lumenstone, Type, false, neighbor.BlockColorAndCoating());
+					}
+				}
 			}
 
 			Tile below = Framing.GetTileSafely(i, j + 1);
@@ -61,23 +73,6 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 			}
 		}
 
-		private void TrySpread(int x, int y) {
-			if (!WorldGen.InWorld(x, y, 2)) {
-				return;
-			}
-
-			Tile tile = Main.tile[x, y];
-			if (!tile.HasTile || tile.TileType != ModContent.TileType<Lumenstone>() || !HasOpenFace(x, y)) {
-				return;
-			}
-
-			tile.TileType = Type;
-			WorldGen.SquareTileFrame(x, y);
-			if (Main.netMode == NetmodeID.Server) {
-				NetMessage.SendTileSquare(-1, x, y);
-			}
-		}
-
 		private static void TryGrow(int x, int y, int type, int style) {
 			if (!WorldGen.InWorld(x, y, 2)) {
 				return;
@@ -86,11 +81,6 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 			if (WorldGen.PlaceTile(x, y, type, mute: true, style: style) && Main.netMode == NetmodeID.Server) {
 				NetMessage.SendTileSquare(-1, x, y);
 			}
-		}
-
-		public static bool HasOpenFace(int x, int y) {
-			return !WorldGen.SolidTile(x - 1, y) || !WorldGen.SolidTile(x + 1, y)
-				|| !WorldGen.SolidTile(x, y - 1) || !WorldGen.SolidTile(x, y + 1);
 		}
 	}
 }

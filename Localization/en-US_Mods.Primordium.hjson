@@ -125,6 +125,15 @@ Tiles: {
 	LumenShards.MapEntry: Lumen Shards
 }
 
+Commands: {
+	Luminous: {
+		Description: Teleport to a Luminous Caverns biome
+		Usage: This world has {0} Luminous Caverns. Use /luminous, or /luminous 2 to pick one
+		None: This world has no Luminous Caverns.
+		Arrived: Teleported to Luminous Caverns ({0} of {1}).
+	}
+}
+
 WorldGen: {
 	LuminousCaverns: Carving luminous caverns
 	LuminousCavernsGrowth: Growing luminous moss

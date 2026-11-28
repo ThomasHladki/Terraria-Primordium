@@ -12,8 +12,10 @@ namespace Primordium.Content.Tiles.LuminousCaverns
 			Main.tileBlockLight[Type] = true;
 			Main.tileMergeDirt[Type] = true;
 			Main.tileStone[Type] = true;
+			Main.tileMerge[Type][Type] = true;
 			Main.tileMerge[Type][TileID.Stone] = true;
 			Main.tileMerge[TileID.Stone][Type] = true;
+			TileID.Sets.Conversion.Stone[Type] = true;
 			TileID.Sets.CanBeClearedDuringOreRunner[Type] = true;
 
 			DustType = DustID.Granite;
